@@ -69,9 +69,9 @@ get_flp_param:
 	mov $0x50,%ax
 	mov %ax,%es
 	mov $4,%di
-	mov $0x78,%ax			#int 0x1e
+	mov $0,%ax			#int 0x1e
 	mov %ax,%ds
-	mov $0,%si
+	mov $0x78,%si
 	lodsw
 	mov %ax,%bx
 	lodsw
@@ -90,9 +90,9 @@ get_hd_param:
 	mov $0x50,%ax
 	mov %ax,%es
 	mov $14,%di
-	mov $0x104,%ax
+	mov $0,%ax
 	mov %ax,%ds
-	mov $0,%si
+	mov $0x104,%si
 	lodsw
 	mov %ax,%bx
 	lodsw
