@@ -52,6 +52,7 @@
 2:
 	call disp_flp_return
 	nop
+	jmp .
 3:
 	movl $0x1200,%eax
 	roll $16,%eax

@@ -9,7 +9,7 @@
 	nop
 	call setup_8253
 	nop
-	call cls
+	call clsr
 	nop
 	call setup_idt
 	nop
@@ -17,10 +17,42 @@
 	call setup_pdt
 	nop
 	sti
+	call motor_on
+	nop
+	movl $0,%eax
+	movb $10,%ah
+	call cmd_seek_head
+	jnc 1f
+8:
 	call disp_flp_param
+	nop
+	movl err,%eax
+	movl errt,%edx
 	jmp .
-//{{{cls
-cls:
+1:	
+	movl $0x1200,%eax
+	roll $16,%eax
+	addl $2,%eax
+	movl $0x20000,%ebx
+	call setup_dma
+	movl $0x1234,%eax
+	movl %eax,err
+	jc 8b
+	nop
+	movl $10,%eax
+	roll $16,%eax
+	call cmd_read_sector
+	movl $0x2345,%eax
+	movl %eax,err
+	jc 8b
+	call motor_off
+	nop
+	call disp_flp_ret
+	nop
+	call show_msg
+	jmp .
+//{{{clsr
+clsr:
 	push %es
 	movl $0x20,%eax
 	movw %ax,%es
@@ -87,6 +119,8 @@ sys_int:
 //{{{flp_int
 flp_int:
 	pushl %eax
+	movl $0x20,%eax
+	outb %al,$0x20
 	movl fflag,%eax
 	orb $0x80,%al
 	movl %eax,fflag
@@ -218,12 +252,11 @@ delay:
 1:
 	movl count,%ebx
 	cmpl %ebx,%eax
-	jae 1b
+	ja 1b
 	popl %ebx
 	popl %eax
 	ret
 //}}}
-
 //{{{cmd_seek_head
 #in:	eax:bit0-1:driverA-D,bit2:head,bit8-bit15:cylinder
 #rt:	CF
@@ -277,6 +310,8 @@ send_cmd:
 	call delay
 	loop 1b
 	stc
+	movl $0xbbb,%eax
+	movl %eax,errt
 	jmp 9f
 2:
 	movl $60,%ecx
@@ -289,11 +324,17 @@ send_cmd:
 	call delay
 	loop 3b
 	stc
+	movl $0xaaa,%eax
+	movl %eax,errt
 	jmp 9f
 4:
 	movl %ebx,%eax
 	incl %edx
 	outb %al,%dx
+#	xorl %eax,%eax
+	movl $0xccc,%eax
+	movl %eax,errt
+	clc
 	jmp .+2
 9:
 	popa
@@ -315,6 +356,8 @@ wait_for_irq:
 	call delay
 	loop 1b
 	stc
+	movl $0x0b0b,%eax
+	movl %eax,errt
 	jmp 3f
 2:	
 	andb $0x7f,%al
@@ -342,21 +385,16 @@ cmd_chk_interrupt:
 recv_cmd:
 	pusha
 	push %ds
-#	push %es
-#	movl $0x38,%eax
-#	movw %ax,%es
 	pop %es
-#	movl $BFLPRT10,%edi
 	movl $fbuf,%edi
 	movl $0,%eax
 	movl $10,%ecx
 	rep stosb
-#	movl $BFLPRT10,%edi
 	movl $fbuf,%edi
 	movl $0x3f4,%edx
 	movl $60,%ecx
 	movl $0,%ebx
-1:
+1:	
 	inb %dx,%al
 	jmp .+2
 	test $0x10,%al
@@ -364,6 +402,8 @@ recv_cmd:
 	movl $20,%eax
 	call delay
 	loop 1b
+	movl $0xeeee,%eax
+	movl %eax,errt
 	jmp 9f
 2:
 	incl %edx
@@ -377,9 +417,9 @@ recv_cmd:
 	movl $60,%ecx
 	jmp 1b
 9:
+	clc
 	movb %bl,%al
 	stosb
-#	pop %es	
 	popa
 	ret
 //}}}
@@ -396,6 +436,7 @@ fetch_param:
 #	movl $BFPARAM12,%edi
 	addl %eax,%edi
 #	movb %gs:(%edi),%al
+	xorl %eax,%eax
 	movb %es:(%edi),%al
 	popl %edi
 	popl %ebx
@@ -451,6 +492,8 @@ cmd_read_sector:
 	jc 9f
 	call wait_for_irq
 	jc 9f
+	movl $0x0a0a,%eax
+	movl %eax,errt
 	call recv_cmd
 9:
 	ret
@@ -512,6 +555,7 @@ setup_dma:
 	andl $0xf,%eax
 	movl $10,%edx
 	outb %al,%dx						#un mask tunnel 2
+	clc
 9:
 	sti
 	popa
@@ -568,12 +612,85 @@ disp_flp_param:
 	popa
 	ret
 //}}}	
-
-
-
-
-
-
+//{{{motor_off
+motor_off:
+	pushl %eax
+	pushl %edx
+	movl $0,%eax
+	movl $0x3f2,%edx
+	outb %al,%dx	
+	popl %edx
+	popl %eax
+	ret
+//}}}
+//{{{disp_flp_ret
+disp_flp_ret:
+	pusha
+	push %es
+	push %ds
+	pop %es
+	leal fbuf,%esi
+	leal outbuf,%edi
+	movl $8,%ecx
+1:
+	lodsb
+	movb %al,%bl
+	rorb $4,%al
+	andb $0xf,%al
+	addb $0x30,%al
+	cmpb $0x39,%al
+	jbe  2f
+	addb $7,%al
+2:
+	stosb
+	movb %bl,%al
+	andb $0xf,%al
+	addb $0x30,%al
+	cmpb $0x39,%al
+	jbe  3f
+	addb $7,%al
+3:
+	stosb
+	movb $0x20,%al
+	stosb
+	loop 1b
+	movl $0x20,%eax
+	movw %ax,%es
+	leal outbuf,%esi
+	movl $0,%edi
+	movl $0x0a00,%eax
+	movl $24,%ecx
+4:
+	lodsb
+	stosw
+	loop 4b
+	pop %es
+	popa
+	ret
+//}}}
+//{{{show_msg
+show_msg:
+	pusha
+	push %ds
+	push %es
+	movl $0x28,%eax
+	movw %ax,%ds
+	movl $0x20000,%esi
+	addl $1024,%esi
+	movl $0x20,%eax
+	movw %ax,%es
+	movl $480,%edi
+	movl $9,%ecx
+	movl $0x0a00,%eax
+1:
+	lodsb
+	stosw
+	loop 1b
+	pop %es
+	pop %ds
+	popa
+	ret
+//}}}
 
 stk:	.long	0x1f00,0x18
 count:	.long	0
@@ -601,6 +718,8 @@ fflag:	.long	0
 err:	.long	0
 fbuf:	.space	20,0
 outbuf:	.space	60,0
+emsg:	.ascii	"error!"
+errt:	.long	0
 .org	3579
 .ascii	"part2"
 
