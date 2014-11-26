@@ -60,8 +60,23 @@
 	movl $0x23456,%eax
 	movl %eax,err
 	jc	8b
+	call move_ff2
+/*到这里，临时磁盘驱动已经成功加载了0x3600字节的kernel模块，如需继续加载可重复前面的加载代码，直到将全部的kernel加载进内存
+ 而前面已经加载的数据位于磁盘的0柱面0磁头的18扇区和1磁头的18扇区。下面将要完成pdt/pt,idt,gdt,tss,ldt正式系统表的设置以及内存
+ 核心表的设置。首先要根据加载进来的kernel模块中各中断处理程序的入口地址生成新的idt*/	
 	call motor_off
 	nop
+	call setup_final_data
+	nop
+	call setup_final_idt
+	nop
+	call setup_final_gdt
+	nop
+	cli
+	lidt l_fidt
+	lgdt l_fgdt
+#	sti
+	jmp $8,$0
 	call disp_flp_ret
 	nop
 	call show_msg
@@ -726,6 +741,183 @@ move_ff1:
 	popa
 	ret
 //}}}
+//{{{move_ff2
+move_ff2:
+	pusha
+	push %ds
+	push %es
+	movl $0x28,%eax
+	movw %ax,%ds
+	movl $0x20000,%esi
+	movl $0x2400,%ecx
+	movl $0x30,%eax
+	movw %ax,%es
+	movl $0x1200,%edi
+	rep movsb	
+	pop %es
+	pop %ds
+	popa
+	ret
+//}}}
+//{{{setup_final_data
+//这是设置最终数据段的关键函数，最终的数据段不是由外存储读入的，关键数据均是由该函数设置的！	
+setup_final_data:
+	pusha
+	push %ds
+	push %es
+	movl $0x38,%eax
+	movw %ax,%ds
+	movl $0,%eax
+#先存储对应_SYS_DATA结构的数据	
+	movl $0,%esi
+	movl %eax,(%esi)			#pos
+	movl %eax,4(%esi)			#count
+	movl $0x10500,%edi
+	movl %ds:(%edi),%eax		#get mem
+	movl %eax,8(%esi)			#mem
+	movl $0,%eax
+	movl %eax,12(%esi)			#real clock
+	movw %ax,16(%esi)
+#存储_SYS_TABLE结构的数据
+	movl $0,%eax
+	movl %eax,18(%esi)			#pdt_off
+	movl $0x1000,%ebx
+	movl %ebx,22(%esi)			#pdt_len
+	movl %ebx,26(%esi)			#pd_off
+	movl %ebx,30(%esi)			#pd_len
+	movl $0x4000,%eax
+	movl %eax,34(%esi)			#idt_off
+	movl $0x800,%eax
+	movl %eax,38(%esi)			#idt_len
+	movl $0x5000,%eax
+	movl %eax,42(%esi)			#gdt_off
+	movl $87,%eax
+	movl %eax,46(%esi)			#gdt_len
+	movl $0x6000,%eax
+	movl %eax,50(%esi)			#tss0_off
+	movl $104,%eax
+	movl %eax,54(%esi)			#tss0_len
+	movl $0x6100,%eax
+	movl %eax,58(%esi)			#ldt0_off
+	movl 47,%eax
+	movl %eax,62(%esi)			#ldt0_len
+	movl $0x6200,%eax
+	movl %eax,66(%esi)			#tss1_off
+	movl $104,%eax
+	movl %eax,70(%esi)			#tss1_len
+	movl $0x6300,%eax
+	movl %eax,74(%esi)			#ldt1_off
+	movl $47,%eax
+	movl %eax,78(%esi)			#ldt1_len
+	movl $0,%eax
+	movl %eax,82(%esi)			#sys_data's offset
+	movl $94,%eax
+	movl %eax,86(%esi)			#sys_flp's offset
+	movl $126,%eax
+	movl %eax,90(%esi)			#sys_seg's offset
+#开始初始化_SYS_FLOPPY的数据	
+	push %ds
+	pop  %es
+	movl %esi,%edi
+	addl $94,%edi
+	movl $0x10504,%esi
+	movl $0,%eax
+	stosl						#98
+	movl $12,%ecx
+	rep movsb					#floppy's parameter
+#初始化_SYS_SEG
+	movl $126,%edi
+	movl $0x1f00,%eax
+	stosl
+	movl $0x18,%eax
+	stosl						#kstk[2]
+	movl $0x10,%eax
+	stosl						#kds
+	movl $0x20,%eax
+	stosl						#kdisp
+	movl $0x28,%eax
+	stosl						#ktab
+	stosl						#kdma
+	movl $0x20000,%eax
+	stosl						#kmda_off
+	movl $0x11000,%eax
+	stosl						#kds_safe_off
+	pop %es
+	pop %ds
+	popa
+	ret
+//}}}
+//{{{setup_final_idt
+setup_final_idt:
+	pusha
+	push %ds
+	push %es
+	movl $0x28,%eax
+	movw %ax,%es
+	movw %ax,%ds
+	movl $0x20000,%esi
+	addl $1700,%esi
+	movl $0x4000,%edi
+	lodsl						#get nor_int
+	movl $0x00080000,%ebx
+	movw %ax,%bx
+	movw $0x8e00,%ax
+	movl $256,%ecx
+1:
+	movl %ebx,%es:(%edi)
+	movl %eax,%es:4(%edi)
+	loop 1b
+	lodsl						#get time_int
+	movl $0x4000,%edi
+	addl $64,%edi
+	movl $0x00080000,%ebx
+	movw %ax,%bx
+	movw $0x8e00,%ax
+	movl %ebx,%es:(%edi)
+	movl %eax,%es:4(%edi)
+	lodsl						#flp_int
+	movl $0x4000,%edi
+	addl $0x70,%edi
+	movl $0x00080000,%ebx
+	movw %ax,%bx
+	movw $0x8e00,%ax
+	movl %ebx,%es:(%edi)
+	movl %eax,%es:4(%edi)
+	lodsl						#sys_int
+	movl $0x4000,%edi
+	movl $0x400,%edi
+	movl $0x00080000,%ebx
+	movw %ax,%bx
+	movw $0xef00,%ax
+	movl %ebx,%es:(%edi)
+	movl %eax,%es:4(%edi)
+	pop %es
+	pop %ds
+	popa
+	ret
+//}}}
+//{{{setup_final_gdt
+setup_final_gdt:
+	pusha
+	movl $0x10,%eax
+	movw %ax,%ds
+	push %es
+	movl $0x28,%eax
+	movw %ax,%es
+	movl $0x5000,%edi
+	leal fgdt,%esi
+	xorl %ecx,%ecx
+	movw l_fgdt,%cx
+	incl %ecx
+	rep movsb
+	pop %es
+	popa
+	ret
+//}}}
+
+
+
+
 
 
 

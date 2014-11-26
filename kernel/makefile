@@ -1,12 +1,19 @@
-k0.elf:k0.bin
-	objcopy -R .pdr -R .comment -R .note -S -O binary k0.bin k0.elf
+vpath %.h ../include
+kernel.elf:kernel.bin
+	objcopy -R .pdr -R .comment -R .note -S -O binary kernel.bin kernel.elf
 %.bin:%.o
-	ld -o $@ $< -Ttext 0
+	ld -o $@ $^ -Ttext 0 -Tdata 2c00
 %.o:%.s
 	as -o $@ $<
+%.o:%.c
+	gcc -fno-builtin -nostdinc -c -o $@ $< -I../include
+klib.o:
+	(cd ../klib;make)
 clean:
 	rm *.o *.bin *.elf
-#------------------------
-k0.bin:k0.o
-k0.o:k0.s
+	(cd ../klib;make clean)
+#----------------------------------
+kernel.bin:kern.o kernel.o ../klib/klib.o
+kern.o:kern.s
+kernel.o:kernel.c 
 

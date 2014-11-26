@@ -26,6 +26,15 @@ SYS_DMA_LEN		=	79
 SYS_DMA_1		=	0x0000
 SYS_DMA_0		=	0x9202
 SYS_DMA_C		=	0x00C0
+//定义默认的代码段,数据段..
+DEF_TEXT_SEG	=	0x8
+DEF_DATA_SEG	=	0x10
+DEF_STACK_SEG	=	0x18
+DEF_DISP_SEG	=	0x20
+//初始化数据段时count的位置
+DEF_COUNT_OFF	=	0x4
+DEF_POS_OFF		=	0
+
 //
 
 /*一、初始化代码段的安排：
