@@ -60,10 +60,10 @@ struct _SYS_FLOPPY
 struct _SYS_SEG
 {
 	long	kstk[2];				//内核堆栈段和栈指针
-	WORD	kds;					//内核数据段
-	WORD	kdisp;					//显示缓冲段
-	WORD	ktab;					//系统表段
-	WORD	kdma;					//dma所在段
+	long	kds;					//内核数据段
+	long	kdisp;					//显示缓冲段
+	long	ktab;					//系统表段
+	long	kdma;					//dma所在段
 	long	kdma_off;				//dma缓冲区偏移
 	long	kds_safe_off;			//安全的数据段使用起始偏移（除去核心数据区）	
 };

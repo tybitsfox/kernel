@@ -1,6 +1,7 @@
 #include"kern.h"
 #include"klib.h"
 
+
 //{{{void* klocate(int index) 定位核心表地址的函数
 void* klocate(int index)
 {
@@ -58,12 +59,12 @@ void _printk0()
 {
 	int i;
 	struct _SYS_SEG *ss=(struct _SYS_SEG *)klocate(K_SEG);
-	i=ss->kdisp;
+//	i=ss->kdisp;
+	i=0x20;
 	__asm__
 		("pusha;push %%es;movw %%ax,%%es;\
 		 movl $158,%%edi;movl $0x0a41,%%eax;\
-		 stosw;pop %%es;popa;"::"a"(i)
-		);
+		 stosw;pop %%es;popa;"::"a"(i));
 	return;
 }
 //}}}
@@ -128,7 +129,7 @@ void _clsr()
 	struct _SYS_SEG *ss=(struct _SYS_SEG*)klocate(K_SEG);
 	int i=(int)(ss->kdisp);
 	__asm__
-		("push %%es;movw %0,%%es;\
+		("push %%es;movw %%ax,%%es;\
 		 movl $0,%%edi;movl $0x7d0,%%ecx;\
 		 movl $0x20,%%eax;rep stosw;\
 		 pop %%es;"::"a"(i));
@@ -151,7 +152,7 @@ void _printk(char *ch)
 	int p=(int)_calc_pos(ch);
 	int len=(int)strlen(ch);
 	__asm__
-		("push %%es;movw %0,%%es;movl %1,%%esi;\
+		("push %%es;movw %%ax,%%es;movl %1,%%esi;\
 		 movl $0x0b00,%%eax;1:;lodsb;stosw;loop 1b;\
 		 "::"a"(i),"m"(ch),"c"(len),"D"(p));
 	return;

@@ -13,7 +13,8 @@ clean:
 	rm *.o *.bin *.elf
 	(cd ../klib;make clean)
 #----------------------------------
-kernel.bin:kern.o kernel.o ../klib/klib.o
-kern.o:kern.s
-kernel.o:kernel.c 
+kernel.bin:kernel.o kern.o ../klib/klib.o
+kernel.o:kernel.s
+#kernel_end.o:kernel_end.s
+kern.o:kern.c 
 

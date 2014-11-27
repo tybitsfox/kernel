@@ -75,10 +75,21 @@
 	cli
 	lidt l_fidt
 	lgdt l_fgdt
+/*	jmp .+2
+	movl $0x10,%eax
+	movw %ax,%ds
+	movw %ax,%es
+	movw %ax,%fs
+	movl $0x18,%eax
+	movw %ax,%ss
+	movl $0x1f00,%eax
+	movl %eax,%esp */
+#	lss stk,%esp
+#	jmp .
 #	sti
-	jmp $8,$0
-	call disp_flp_ret
-	nop
+	jmp $0x8,$0
+#	call disp_flp_ret
+#	nop
 	call show_msg
 	movl $0,%eax
 	movl $0,%edx
@@ -703,9 +714,44 @@ disp_flp_ret:
 //{{{show_msg
 show_msg:
 	pusha
+	leal outbuf,%edi
 	push %ds
 	push %es
-	movl $0x28,%eax
+	movl $0x30,%eax
+	movw %ax,%ds
+	movl $0,%esi
+	movl $10,%ecx
+1:
+	lodsb
+	movb %al,%bl
+	rorb $4,%al
+	andb $0xf,%al
+	addb $0x30,%al
+	cmpb $0x39,%al
+	jbe  2f
+	addb $7,%al
+2:
+	stosb
+	movb %bl,%al
+	andb $0xf,%al
+	addb $0x30,%al
+	cmpb $0x39,%al
+	jbe 3f
+	addb $7,%al
+3:
+	stosb
+	movb $0x20,%al
+	stosb
+	loop 1b
+	movl $0x10,%eax
+	movw %ax,%ds
+	movl $0x20,%eax
+	movw %ax,%es
+	leal outbuf,%esi
+	movl $480,%edi
+	movl $30,%ecx
+	movl $0x0a00,%eax
+/*	movl $0x28,%eax
 	movw %ax,%ds
 	movl $0x20000,%esi
 	addl $1024,%esi
@@ -713,7 +759,7 @@ show_msg:
 	movw %ax,%es
 	movl $480,%edi
 	movl $13,%ecx
-	movl $0x0a00,%eax
+	movl $0x0a00,%eax */
 1:
 	lodsb
 	stosw
@@ -856,7 +902,7 @@ setup_final_idt:
 	movw %ax,%es
 	movw %ax,%ds
 	movl $0x20000,%esi
-	addl $1700,%esi
+	addl $0x1a00,%esi			#??1700
 	movl $0x4000,%edi
 	lodsl						#get nor_int
 	movl $0x00080000,%ebx
@@ -866,6 +912,7 @@ setup_final_idt:
 1:
 	movl %ebx,%es:(%edi)
 	movl %eax,%es:4(%edi)
+	addl $8,%edi
 	loop 1b
 	lodsl						#get time_int
 	movl $0x4000,%edi
@@ -928,7 +975,7 @@ l_idt:	.word	0x800
 		.long	0x7000,0
 l_fidt:	.word	0x800
 		.long	0x4000,0
-l_fgdt:	.word	87
+l_fgdt:	.word	95
 		.long	0x5000,0
 fgdt:
 		.word	0,0,0,0
@@ -941,6 +988,7 @@ fgdt:
 		.word	47,0x6100,0xe200,0			#0x38 ldt0
 		.word	104,0x6200,0xe900,0			#0x40 tss1
 		.word	47,0x6300,0xe200,0			#0x48 ldt1
+		.word	127,0x000,0x9210,0x00c0		#0x50 new text
 		.word	0,0,0,0
 msg:	.ascii	"booting.......................[ok]"
 len=.-msg
