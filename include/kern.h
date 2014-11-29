@@ -9,7 +9,7 @@
 #define size_t	unsigned int
 #endif
 //定义系统表的索引，=内核数据段中的偏移,偏移0存放_sys_data结构，随后存_sys_table
-#define	SYS_TABLE_INDEX	18
+#define	SYS_TABLE_INDEX	0x100012
 //{{{ 下面结构定义了各系统表的存储信息 struct _SYS_TABLE
 struct _SYS_TABLE
 {

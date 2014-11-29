@@ -2,55 +2,44 @@
 #include"klib.h"
 
 
-//{{{void* klocate(int index) 定位核心表地址的函数
-void* klocate(int index)
+//{{{long klocate(int index) 定位核心表地址的函数
+long klocate(int index)
 {
 	struct _SYS_TABLE *p;
-	void *p1;
+	long p1;
 	p=(struct _SYS_TABLE *)SYS_TABLE_INDEX;
 	switch(index)
 	{
 	case K_PDT:
-		p1=(void *)p->pdt_off;
-		break;
+		return p->pdt_off;
 	case K_PT:
-		p1=(void *)p->pt_off;
-		break;
+		return p->pt_off;
 	case K_IDT:
-		p1=(void *)p->idt_off;
-		break;
+		return p->idt_off;
 	case K_GDT:
-		p1=(void *)p->gdt_off;
-		break;
+		return p->gdt_off;
 	case K_TSS0:
-		p1=(void *)p->tss0_off;
-		break;
+		return p->tss0_off;
 	case K_LDT0:
-		p1=(void *)p->ldt0_off;
-		break;
+		return p->ldt0_off;
 	case K_TSS1:
-		p1=(void *)p->tss1_off;
-		break;
+		return p->tss1_off;
 	case K_LDT1:
-		p1=(void *)p->ldt1_off;
-		break;
+		return p->ldt1_off;
 	case K_DATA:
-		p1=(void *)p->sys_data;
-		break;
+		return p->sys_data;
 	case K_FLP:
-		p1=(void *)p->sys_flp;
-		break;
+		return p->sys_flp; 
 	case K_SEG:
-		p1=(void *)p->sys_seg;
-		break;
+		return p->sys_seg; 
 	};
-	return p1;
+	return 0;
 }
 //}}}
 //{{{long kpos() 获得光标位置的函数
 long kpos()
 {
-	struct _SYS_DATA *sd=(struct _SYS_DATA *)0;
+	struct _SYS_DATA *sd=(struct _SYS_DATA *)0x100000;
 	return sd->pos;
 }
 //}}}
@@ -59,8 +48,8 @@ void _printk0()
 {
 	int i;
 	struct _SYS_SEG *ss=(struct _SYS_SEG *)klocate(K_SEG);
-//	i=ss->kdisp;
-	i=0x20;
+	i=ss->kdisp;
+//	i=0x20;
 	__asm__
 		("pusha;push %%es;movw %%ax,%%es;\
 		 movl $158,%%edi;movl $0x0a41,%%eax;\

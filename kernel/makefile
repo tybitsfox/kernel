@@ -7,6 +7,7 @@ kernel.elf:kernel.bin
 	as -o $@ $<
 %.o:%.c
 	gcc -fno-builtin -nostdinc -c -o $@ $< -I../include
+#-fno-strict-aliasing -fno-common	
 klib.o:
 	(cd ../klib;make)
 clean:
@@ -15,6 +16,5 @@ clean:
 #----------------------------------
 kernel.bin:kernel.o kern.o ../klib/klib.o
 kernel.o:kernel.s
-#kernel_end.o:kernel_end.s
 kern.o:kern.c 
 

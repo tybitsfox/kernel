@@ -1,3 +1,4 @@
+.include"../include/defconst.inc"
 .data
 .text
 	movl $0x10,%eax
@@ -68,24 +69,16 @@
 	nop
 	call setup_final_data
 	nop
+	cli
+	call reset_8259A
+	nop
 	call setup_final_idt
 	nop
 	call setup_final_gdt
 	nop
-	cli
+#	cli
 	lidt l_fidt
 	lgdt l_fgdt
-/*	jmp .+2
-	movl $0x10,%eax
-	movw %ax,%ds
-	movw %ax,%es
-	movw %ax,%fs
-	movl $0x18,%eax
-	movw %ax,%ss
-	movl $0x1f00,%eax
-	movl %eax,%esp */
-#	lss stk,%esp
-#	jmp .
 #	sti
 	jmp $0x8,$0
 #	call disp_flp_ret
@@ -814,7 +807,7 @@ setup_final_data:
 	movl $0x38,%eax
 	movw %ax,%ds
 	movl $0,%eax
-#先存储对应_SYS_DATA结构的数据	
+#先存储对应_SYS_DATA结构的数据
 	movl $0,%esi
 	movl %eax,(%esi)			#pos
 	movl %eax,4(%esi)			#count
@@ -855,11 +848,15 @@ setup_final_data:
 	movl %eax,74(%esi)			#ldt1_off
 	movl $47,%eax
 	movl %eax,78(%esi)			#ldt1_len
+	movl $KERNEL_DATA_BEGIN,%ebx
 	movl $0,%eax
+	addl %ebx,%eax
 	movl %eax,82(%esi)			#sys_data's offset
 	movl $94,%eax
+	addl %ebx,%eax
 	movl %eax,86(%esi)			#sys_flp's offset
 	movl $126,%eax
+	addl %ebx,%eax
 	movl %eax,90(%esi)			#sys_seg's offset
 #开始初始化_SYS_FLOPPY的数据	
 	push %ds
@@ -886,7 +883,7 @@ setup_final_data:
 	stosl						#kdma
 	movl $0x20000,%eax
 	stosl						#kmda_off
-	movl $0x11000,%eax
+	movl $0x101000,%eax
 	stosl						#kds_safe_off
 	pop %es
 	pop %ds
@@ -916,7 +913,8 @@ setup_final_idt:
 	loop 1b
 	lodsl						#get time_int
 	movl $0x4000,%edi
-	addl $64,%edi
+#	addl $64,%edi				now change to int0x20~~
+	addl $0x100,%edi
 	movl $0x00080000,%ebx
 	movw %ax,%bx
 	movw $0x8e00,%ax
@@ -924,7 +922,8 @@ setup_final_idt:
 	movl %eax,%es:4(%edi)
 	lodsl						#flp_int
 	movl $0x4000,%edi
-	addl $0x70,%edi
+#	addl $0x70,%edi				now change to int0x26~~
+	addl $0x130,%edi
 	movl $0x00080000,%ebx
 	movw %ax,%bx
 	movw $0x8e00,%ax
@@ -961,8 +960,59 @@ setup_final_gdt:
 	popa
 	ret
 //}}}
-
-
+//{{{reset_8259A
+reset_8259A:
+	pusha
+	movl $0x11,%eax			#初始化命令字
+	movl $0x20,%edx
+	out %al,%dx				#发送至主芯片
+	jmp .+2
+	jmp .+2
+	movl $0xa0,%edx			#发送至从芯片
+	outb %al,%dx
+	jmp .+2
+	jmp .+2
+	movl $0x20,%eax			#设置主芯片中断起始号
+	movl $0x21,%edx
+	outb %al,%dx
+	jmp .+2
+	jmp .+2
+	movl $0xa1,%edx
+	movl $0x28,%eax			#设置从芯片中断起始号
+	outb %al,%dx
+	jmp .+2
+	jmp .+2
+	movl $4,%eax			#设置主芯片的IR2连接从芯片INT
+	movl $0x21,%edx
+	outb %al,%dx
+	jmp .+2
+	jmp .+2
+	movl $2,%eax			#设置从芯片的INT连接主芯片的IR2
+	movl $0xa1,%edx
+	outb %al,%dx
+	jmp .+2
+	jmp .+2
+	movl $1,%eax			#设置8086模式，普通EIO，非缓冲，需发送命令字复位
+	movl $0x21,%edx
+	outb %al,%dx
+	jmp .+2
+	jmp .+2
+	movl $0xa1,%edx
+	outb %al,%dx
+	jmp .+2
+	jmp .+2
+	movl $0xff,%eax			#屏蔽命令字，屏蔽所有中断
+	movl $0x21,%edx
+	outb %al,%dx
+	jmp .+2
+	jmp .+2
+	movl $0xa1,%edx
+	outb %al,%dx
+	jmp .+2
+	jmp .+2
+	popa
+	ret
+//}}}
 
 
 
@@ -975,20 +1025,19 @@ l_idt:	.word	0x800
 		.long	0x7000,0
 l_fidt:	.word	0x800
 		.long	0x4000,0
-l_fgdt:	.word	95
+l_fgdt:	.word	87
 		.long	0x5000,0
 fgdt:
 		.word	0,0,0,0
-		.word	127,0x000,0x9a10,0x00c0		#0x8 text
-		.word	127,0x000,0x9220,0x00c0		#0x10 data
-		.word	1,0xe000,0x921f,0x00c0		#0x18 stack
+		.word	511,0x000,0x9a10,0x00c0		#0x8 text
+		.word	511,0x000,0x9210,0x00c0		#0x10 data
+		.word	1,0xe000,0x922f,0x00c0		#0x18 stack
 		.word	7,0x8000,0x920b,0x00c0		#0x20 disp
 		.word	159,0x000,0x9200,0x00c0		#0x28 sys table
 		.word	104,0x6000,0xe900,0			#0x30 tss0
 		.word	47,0x6100,0xe200,0			#0x38 ldt0
 		.word	104,0x6200,0xe900,0			#0x40 tss1
 		.word	47,0x6300,0xe200,0			#0x48 ldt1
-		.word	127,0x000,0x9210,0x00c0		#0x50 new text
 		.word	0,0,0,0
 msg:	.ascii	"booting.......................[ok]"
 len=.-msg

@@ -20,7 +20,7 @@ long _calc_pos(char *ch);
 void _printk(char *ch);
 void* memset(void *src,BYTE b,size_t len);
 void* memcpy(void *src,void *dst,size_t len);
-void* klocate(int index);
+long klocate(int index);
 long kpos();
 void _printk0();
 size_t strlen(char *ch);
